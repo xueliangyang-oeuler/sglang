@@ -28,7 +28,11 @@ _is_musa = is_musa()
 
 if _is_cuda:
     try:
-        import pynvml
+        import warnings
+
+        with warnings.catch_warnings():
+            warnings.filterwarnings("ignore", category=FutureWarning)
+            import pynvml
     except ImportError as e:
         logger.warning("Failed to import pynvml with %r", e)
 
