@@ -159,6 +159,7 @@ def test_fused_moe_wn16(
     has_zp: bool,
     weight_bits: int,
 ):
+    set_global_server_args_for_scheduler(ServerArgs(model_path="dummy"))
     print(m, n, k, e, topk, dtype, group_size, has_zp, weight_bits)
     a = torch.randn((m, k), device=get_device(), dtype=dtype) / 10
     w1 = torch.randn((e, 2 * n, k), device=get_device(), dtype=dtype) / 10
