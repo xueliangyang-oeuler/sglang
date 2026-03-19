@@ -49,13 +49,19 @@ def mamba2_state_dtype(config=None) -> Mamba2StateDType:
     Get mamba2 state dtype from config or environment variable.
 
     Priority (from highest to lowest):
+    1. Environment variable SGLANG_MAMBA_CONV_DTYPE (for conv dtype)
+    2. Config file (config.torch_dtype or config.text_config.torch_dtype, for conv dtype)
+    3. Default "bfloat16" for conv, "float32" for SSM
+
+    For SSM dtype:
     1. Environment variable SGLANG_MAMBA_SSM_DTYPE
     2. Config file (config.mamba_ssm_dtype or config.text_config.mamba_ssm_dtype)
     3. Default "float32"
 
     Args:
         config: Optional config object (PretrainedConfig). If provided, will read
-                mamba_ssm_dtype from it. For VL models, reads from text_config.
+                mamba_ssm_dtype and torch_dtype from it. For VL models, reads from
+                text_config.
 
     Returns:
         Mamba2StateDType with conv and temporal dtypes
@@ -65,7 +71,27 @@ def mamba2_state_dtype(config=None) -> Mamba2StateDType:
         "bfloat16": torch.bfloat16,
         "float16": torch.float16,
     }
-    conv_dtype = dtype_map.get(envs.SGLANG_MAMBA_CONV_DTYPE.get(), torch.bfloat16)
+
+    # Get conv dtype: env var -> config torch_dtype -> default bfloat16
+    env_conv_dtype = envs.SGLANG_MAMBA_CONV_DTYPE.get()
+    if env_conv_dtype is not None:
+        conv_dtype = dtype_map.get(env_conv_dtype, torch.bfloat16)
+    elif config is not None:
+        # Infer from model config's torch_dtype
+        config_dtype = None
+        if hasattr(config, "text_config") and hasattr(
+            config.text_config, "torch_dtype"
+        ):
+            config_dtype = config.text_config.torch_dtype
+        elif hasattr(config, "torch_dtype"):
+            config_dtype = config.torch_dtype
+
+        if config_dtype is not None and config_dtype in dtype_map:
+            conv_dtype = dtype_map[config_dtype]
+        else:
+            conv_dtype = torch.bfloat16
+    else:
+        conv_dtype = torch.bfloat16
 
     # Get SSM dtype: default -> config -> env var
     ssm_dtype = torch.float32  # Step 1: Default value
