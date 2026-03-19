@@ -445,8 +445,16 @@ def _dispatch_auto_backend() -> Callable:
         return triton_w8a8_block_fp8_linear
 
 
-def initialize_fp8_gemm_config(server_args: ServerArgs) -> None:
-    """Initialize FP8 GEMM configuration."""
+def initialize_fp8_gemm_config(
+    server_args: ServerArgs, use_scale_ue8m0: Optional[bool] = None
+) -> None:
+    """Initialize FP8 GEMM configuration.
+
+    Args:
+        server_args: Server arguments containing fp8_gemm_runner_backend setting.
+        use_scale_ue8m0: Whether the checkpoint uses ue8m0 scale format.
+            If None, the scale format check is skipped.
+    """
     global FP8_GEMM_RUNNER_BACKEND
 
     backend = server_args.fp8_gemm_runner_backend
@@ -470,8 +478,18 @@ def initialize_fp8_gemm_config(server_args: ServerArgs) -> None:
             )
 
     if backend == "auto" and is_sm120_supported():
+        # When the checkpoint scale_fmt is not ue8m0 on Blackwell, DeepGemm
+        # will produce incorrect results (accuracy degradation or CUDA crashes).
+        # Fall back to triton which is compatible with non-ue8m0 formats.
         # TODO(brayden): Verify if CUTLASS can be set by default once SwapAB is supported
-        backend = "triton"
+        if use_scale_ue8m0 is False:
+            backend = "triton"
+            logger.info(
+                "Blackwell FP8 with non-ue8m0 scale detected, "
+                "falling back to triton backend for compatibility"
+            )
+        else:
+            backend = "triton"
 
     FP8_GEMM_RUNNER_BACKEND = Fp8GemmRunnerBackend(backend)
 
