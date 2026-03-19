@@ -147,8 +147,16 @@ class FlashInferGDNKernel(LinearAttnKernelBase):
         a_fi = a.view(batch_size, 1, num_v_heads)
         b_fi = b.view(batch_size, 1, num_v_heads)
 
+        # Clamp negative padding indices to sentinel slot to prevent OOB access.
+        # This mirrors the fix applied in the extend() method.
+        safe_indices = torch.where(
+            cache_indices >= 0,
+            cache_indices,
+            ssm_states.shape[0] - 1,
+        ).to(torch.int64)
+
         # Gather states from pool
-        state_batch = ssm_states[cache_indices]
+        state_batch = ssm_states[safe_indices]
 
         output_fi, new_state = self._decode_fn(
             q=query_fi,
@@ -164,8 +172,8 @@ class FlashInferGDNKernel(LinearAttnKernelBase):
             use_qk_l2norm=True,
         )
 
-        # Scatter updated states back to pool
-        ssm_states[cache_indices] = new_state
+        # Scatter updated states back to pool, only for valid (non-padding) slots
+        ssm_states[safe_indices] = new_state
 
         # [bs, 1, HV, V] -> [1, bs, HV, V]
         return output_fi.view(1, batch_size, num_v_heads, head_v_dim)
