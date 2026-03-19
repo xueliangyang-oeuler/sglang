@@ -40,6 +40,7 @@ from sglang.multimodal_gen.runtime.platforms import (
 from sglang.multimodal_gen.runtime.server_args import ServerArgs
 from sglang.multimodal_gen.runtime.utils.hf_diffusers_utils import maybe_download_model
 from sglang.multimodal_gen.runtime.utils.logging_utils import init_logger
+from sglang.multimodal_gen import envs
 from sglang.srt.utils import get_compiler_backend, is_npu
 
 logger = init_logger(__name__)
@@ -639,14 +640,24 @@ class DiffusersPipeline(ComposedPipelineBase):
                     # modules which can significantly reduce compilation time for large models
                     # with repeated blocks.
                     if is_npu():
-                        backend = get_compiler_backend()
-                        if isinstance(component, torch.nn.Module) and hasattr(
-                            component, "compile"
-                        ):
-                            component.compile(backend=backend)
-                        else:
-                            compiled_component = torch.compile(component, backend=backend)
-                            setattr(pipe, comp, compiled_component)
+                        logger.warning(
+                            "torch.compile on NPU for diffusion models causes severe "
+                            "performance degradation (6x+ latency increase). "
+                            "Skipping torch.compile on NPU. Set SGLANG_FORCE_TORCH_COMPILE_NPU=1 "
+                            "to override this warning."
+                        )
+                        if envs.SGLANG_FORCE_TORCH_COMPILE_NPU.get():
+                            backend = get_compiler_backend()
+                            if isinstance(component, torch.nn.Module) and hasattr(
+                                component, "compile"
+                            ):
+                                component.compile(backend=backend)
+                            else:
+                                compiled_component = torch.compile(
+                                    component, backend=backend
+                                )
+                                setattr(pipe, comp, compiled_component)
+                        continue
                     else:
                         if isinstance(component, torch.nn.Module) and hasattr(
                             component, "compile"

@@ -279,6 +279,8 @@ environment_variables: dict[str, Callable[[], Any]] = {
     ),
     # ROCm: use AITer GroupNorm in VAE for improved performance
     "SGLANG_USE_ROCM_VAE": _lazy_bool("SGLANG_USE_ROCM_VAE"),
+    # Force torch.compile on NPU (not recommended due to severe performance degradation)
+    "SGLANG_FORCE_TORCH_COMPILE_NPU": _lazy_bool("SGLANG_FORCE_TORCH_COMPILE_NPU"),
 }
 
 # Add cache-dit Secondary Transformer Env Vars via programmatic generation to reduce duplication
