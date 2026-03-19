@@ -22,4 +22,15 @@ def _compute_enable_deep_gemm():
 ENABLE_JIT_DEEPGEMM = _compute_enable_deep_gemm()
 
 DEEPGEMM_BLACKWELL = ENABLE_JIT_DEEPGEMM and is_blackwell_supported()
-DEEPGEMM_SCALE_UE8M0 = DEEPGEMM_BLACKWELL
+
+
+def get_deep_gemm_scale_ue8m0(
+    fp4_gemm_runner_backend: str = "auto",
+    fp8_gemm_runner_backend: str = "auto",
+) -> bool:
+    if not DEEPGEMM_BLACKWELL:
+        return False
+    return fp4_gemm_runner_backend == "auto" and fp8_gemm_runner_backend == "auto"
+
+
+DEEPGEMM_SCALE_UE8M0 = get_deep_gemm_scale_ue8m0()
